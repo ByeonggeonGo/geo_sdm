@@ -1,0 +1,47 @@
+전체셔플: 808, 203
+2020테스트셋: 908, 103
+
+
+col_map = {
+'수소이온농도(pH)': 'pH',
+'전기전도도(EC)': 'electrical_conductivity(EC)',
+'생물화학적산소요구량(BOD)': 'biological_oxygen_demand(BOD,mg/L)',
+'용존산소(DO)': 'dissolved_oxygen(DO,mg/L)',
+'화학적산소요구량(COD)': 'chemical_oxygen_demand(COD,mg/L)',
+
+
+'cate_1': 'Urbanized-dry land cover',
+'cate_2': 'Agricultural land cover',
+'cate_3': 'Forest land cover',
+'cate_4': 'Grassland land cover',
+'cate_5': 'Wetland (riparian vegetation) land cover',
+'cate_6': 'Barren land cover',
+'cate_7': 'Water area land cover',
+
+
+'최대 순간 풍속(m/s)': 'maximum_instantaneous_wind_speed(m/s)',
+'평균 해면기압(hPa)': 'average_sea_level_pressure(hPa)',
+'평균 풍속(m/s)': 'average_wind_speed(m/s)',
+'최대 풍속(m/s)': 'maximum_wind_speed(m/s)',
+'평균 현지기압(hPa)': 'average_local_pressure(hPa)',
+'평균기온(°C)': 'average_temperature(°C)',
+'최소 상대습도(%)': 'minimum_relative_humidity(%)',
+'평균 이슬점온도(°C)': 'average_dew_point_temperature(°C)',
+'10분 최다 강수량(mm)': '10_min_max_precipitation(mm)',
+'평균 지면온도(°C)': 'average_ground_temperature(°C)',
+'합계 일조시간(hr)': 'total_sunshine_duration(hr)',
+'평균 증기압(hPa)': 'average_vapor_pressure(hPa)',
+'최저 해면기압(hPa)': 'minimum_sea_level_pressure(hPa)',
+'최저기온(°C)': 'minimum_temperature(°C)',
+'일강수량(mm)': 'daily_precipitation(mm)',
+'최고기온(°C)': 'maximum_temperature(°C)',
+'평균 상대습도(%)': 'average_relative_humidity(%)',
+'최저 초상온도(°C)': 'minimum_dew_point_temperature(°C)',
+'1시간 최다강수량(mm)': '1hr_max_precipitation(mm)',
+
+'평균수심': 'mean_water_depth(m)',
+'수면폭': 'width_water_surface(m)',
+'유량': 'discharge(m3/s)',
+'단면적': 'cross-sectional_area(m2)',
+'평균유속': 'mean_flow_velocity(m/s)',
+}
