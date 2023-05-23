@@ -1,6 +1,7 @@
 from geosdm.dataprocessing import datacontroller
 import os
 from glob import glob
+import pandas as pd
 
 data_path_list = os.getcwd().split(os.path.sep) + ['data']
 data_path = os.path.sep.join(data_path_list)

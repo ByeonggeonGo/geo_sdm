@@ -7,8 +7,9 @@ import pandas as pd
 import numpy as np
 
 class SpiciesDistributionModel():
-    def __init__(self, data_path: str):
+    def __init__(self, data_path: str, species_name: str):
         self._data_path = data_path
+        self._species_name = species_name
         self._col_map = col_map = {
                         '수소이온농도(pH)': 'pH',
                         '전기전도도(EC)': 'electrical_conductivity(EC)',
@@ -71,19 +72,64 @@ class SpiciesDistributionModel():
         self._df_list_by_name = df_list_by_name
         self._df_list_name = df_list_name
 
-    def model_fitting(self, species_name: str) -> list[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[str]]:
+        # self.model_fitting()
+        feature_names = [self._col_map[name] for name in self._sub_feat_list]
+        self._feature_name_kor = feature_names
 
-        y = self._df_list_by_name[self._df_list_name.index('Rhithrogena na')].iloc[:,0].map(lambda x : 1 if x > 0 else 0).values
-        x = self._df_list_by_name[self._df_list_name.index('Rhithrogena na')].loc[:,self._sub_feat_list].values
+    # def model_fitting(self) -> list[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[str]]:
+    def model_fitting(self,x,y):
+
         x, x_test, y, y_test = train_test_split(x, y, test_size=0.2, random_state=93,)
         model = XGBClassifier(random_state=100)
         model.fit(x,y.ravel())
+        
+        self._model = model
+        # self._x = x
+        # self._x_test = x_test
+        # self._y = y
+        # self._y_test = y_test
 
-        shap_values = shap.TreeExplainer(model).shap_values(x)
 
-        return [x, x_test, y, y_test, shap_values, [self._col_map[name] for name in self._sub_feat_list]]
+        y_pred_train=model.predict(x)
+        score1_train = sklearn.metrics.accuracy_score(y_true=y, y_pred=y_pred_train)
+        score2_train = sklearn.metrics.recall_score(y_true=y, y_pred=y_pred_train)
+        fpr, tpr, thresholds = sklearn.metrics.roc_curve(y, y_pred_train, pos_label=1)
+        score3_train = sklearn.metrics.auc(fpr, tpr)
+
+        y_pred=model.predict(x_test)
+        score1 = sklearn.metrics.accuracy_score(y_true=y_test, y_pred=y_pred)
+        score2 = sklearn.metrics.recall_score(y_true=y_test, y_pred=y_pred)
+        fpr, tpr, thresholds = sklearn.metrics.roc_curve(y_test, y_pred, pos_label=1)
+        score3 = sklearn.metrics.auc(fpr, tpr)
+
+        self.train_accuracy=score1_train
+        self.train_recall=score2_train
+        self.train_auc=score3_train
+
+        self.test_accuracy=score1
+        self.test_recall=score2
+        self.test_auc=score3
+
+        train_len = len(y)
+        test_len = len(y_test)
+
+        train_presence_len = sum(y)
+        test_presence_len = sum(y_test)
+
+        self.train_len = train_len
+        self.test_len = test_len
+        self.train_presence_len = train_presence_len
+        self.test_presence_len = test_presence_len
+
+        # shap_values = shap.TreeExplainer(model).shap_values(x)
+
+        # return [x, x_test, y, y_test, shap_values, [self._col_map[name] for name in self._sub_feat_list]]
 
         # shap.summary_plot(shap_values, x, feature_names=[self._col_map[name] for name in self._sub_feat_list],show=False,max_display=10)
+
+    def get_shap_information(self, inputs)-> np.ndarray:
+        shap_values = shap.TreeExplainer(self._model).shap_values(inputs)
+        return shap_values
     
 
     
