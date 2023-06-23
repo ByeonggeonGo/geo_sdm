@@ -339,3 +339,85 @@ def merge_hyd_monitoring_n_coords(data_path: str):
     hyd_df_merged = gpd.GeoDataFrame(hyd_df_merged, geometry= 'geometry')
     pickle.dump(hyd_df_merged, open(os.path.join(data_path,"merged","merged_1","hyd_gdf.p",), "wb"))
         
+def resample_hyd_data(hyd_gdf):
+
+    remove_col = {'수계명',
+    '관측소명',
+    '측정시각',
+    'x',
+    'y',
+    'geometry',
+    'OBJECTID',
+    'CAT_ID',
+    'CAT_DID',
+    'BRU_X',
+    'BRU_Y',
+    'BLL_X',
+    'BLL_Y',
+    'Shape_Leng',
+    'Shape_Area',
+    'streamname',
+    'BASIN_ID',
+    'BASIN_NM',
+    'MB_ID',
+    'MB_NM',
+    'SB_ID',
+    'SB_NM',
+    'CAT_SN',
+    'CAT_DIV',
+    'AREA',
+    'PERI',
+    'CAT_FLAG'
+    }
+
+    after_add = [
+                'OBJECTID',
+                'CAT_ID',
+                'CAT_DID',
+                'BRU_X',
+                'BRU_Y',
+                'BLL_X',
+                'BLL_Y',
+                'Shape_Leng',
+                'Shape_Area',
+                'streamname',
+                'BASIN_ID',
+                'BASIN_NM',
+                'MB_ID',
+                'MB_NM',
+                'SB_ID',
+                'SB_NM', 
+                '관측소명',
+                'geometry']
+    all_col = set(hyd_gdf.columns)
+    remain_col = list(all_col - remove_col) + ['측정시각']
+
+    site_list = list(set(hyd_gdf.관측소명.values))
+    df_bysite_list = []
+    for s_name in site_list:
+        t_df = hyd_gdf.loc[hyd_gdf.관측소명 == s_name, remain_col].set_index('측정시각').resample(rule = '1Y').mean()
+        t_df.loc[:,after_add] = np.array(hyd_gdf.loc[hyd_gdf.관측소명 == s_name, after_add].iloc[0].tolist(), dtype = object)
+        df_bysite_list.append(t_df)
+
+    hyd_df_resampled = pd.concat(df_bysite_list)
+
+    hyd_df_resampled.loc[:,'년'] = hyd_df_resampled.index.year.tolist()
+    hyd_df_resampled.index = range(len(hyd_df_resampled))
+    hyd_df_filter_1 = hyd_df_resampled.loc[:, ['수면폭', '평균유속', '단면적', '평균수심', '유량','CAT_DID','관측소명', 'geometry', '년']]
+
+    tem_cols = hyd_df_filter_1.columns.tolist()
+    tem_cols.remove('년')
+    hyd_df_filter_1 = hyd_df_filter_1.loc[(hyd_df_filter_1.년 >= 2015) & (hyd_df_filter_1.년 <= 2020),tem_cols]
+
+    mean_df = hyd_df_filter_1.groupby('관측소명').mean()
+    q1_df = hyd_df_filter_1.groupby('관측소명').quantile([0.25]).set_index(mean_df.index)
+    q1_df.columns = [name+"_q1" for name in q1_df.columns.to_list()]
+    q3_df = hyd_df_filter_1.groupby('관측소명').quantile([0.75]).set_index(mean_df.index)
+    q3_df.columns = [name+"_q3" for name in q3_df.columns.to_list()]
+
+    hyd_df_filter_2 = pd.concat([mean_df,q1_df,q3_df], axis = 1)
+    hyd_df_filter_2.loc[:,'관측소명'] = hyd_df_filter_2.index
+    hyd_df_filter_2.index = range(len(hyd_df_filter_2))
+
+    hyd_df_filter_3 = pd.merge(hyd_df_filter_2,hyd_df_filter_1.drop_duplicates('관측소명').loc[:, ['관측소명', 'geometry','CAT_DID']], how = 'left', on = '관측소명')
+    return hyd_df_filter_3

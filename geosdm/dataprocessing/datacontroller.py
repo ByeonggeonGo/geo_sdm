@@ -88,63 +88,70 @@ class DataContorller():
 
         sp_gdf = self._Order_gdf if summary_level == 'Order' else self._Family_gdf if summary_level == 'Family' else self._name_gdf
 
-        filter_5_sp_df = ecological_info.resample_ecological_data(sp_gdf)
-        atm_df_filter_3 = weather.resample_weather_data(self._atm_gdf)
-        filter_5_wq_data = water_quality_info.resample_wq_data(self._wq_gdf)
+        filter_sp_data = ecological_info.resample_ecological_data(sp_gdf)
+        filter_atm_data = weather.resample_weather_data(self._atm_gdf)
+        filter_wq_data = water_quality_info.resample_wq_data(self._wq_gdf)
+        filter_hyd_data = hydinfo.resample_hyd_data(self._hyd_gdf)
 
 
         # 기상지점 할당
-        for i in range(len(filter_5_sp_df)):
-        
+        for i in range(len(filter_sp_data)):
             # test.geometry[i].distance(atm_df_resampled.geometry)
-            result = [filter_5_sp_df.geometry[i].distance(at_point) for at_point in atm_df_filter_3.geometry]
+            result = [filter_sp_data.geometry[i].distance(at_point) for at_point in filter_atm_data.geometry]
             min_ind = np.argmin(result)
-            filter_5_sp_df.loc[i,'기상지점'] = atm_df_filter_3.iloc[min_ind].지점명
+            filter_sp_data.loc[i,'기상지점'] = filter_atm_data.iloc[min_ind].지점명# 수질정보 병합
+        
         # 수질정보 병합
-        tem_cols = filter_5_wq_data.columns.tolist()
+        tem_cols = filter_wq_data.columns.tolist()
         tem_cols.remove('geometry')
 
-        merged_df = pd.merge(filter_5_sp_df, filter_5_wq_data.loc[:,tem_cols], how='left', left_on=['CAT_DID'], right_on=['CAT_DID'])
+        merged_df = pd.merge(filter_sp_data, filter_wq_data.loc[:,tem_cols], how='left', left_on=['CAT_DID'], right_on=['CAT_DID'])
         merged_df = merged_df.drop_duplicates('조사지점')
         merged_df.index = range(len(merged_df))
-
+        
         # 기상정보 병합
-        tem_cols_2 = atm_df_filter_3.columns.tolist()
+        tem_cols_2 = filter_atm_data.columns.tolist()
         tem_cols_2.remove('geometry')
 
-        merged_df_2 = pd.merge(merged_df, atm_df_filter_3.loc[:,tem_cols_2], how='left', left_on=['기상지점'], right_on=['지점명'])
+        merged_df_2 = pd.merge(merged_df, filter_atm_data.loc[:,tem_cols_2], how='left', left_on=['기상지점'], right_on=['지점명'])
+
+        #수리수문 병합
+        tem_cols_3 = filter_hyd_data.columns.tolist()
+        tem_cols_3.remove('관측소명')
+        tem_cols_3.remove('geometry')
+
+        merged_df_3 = pd.merge(merged_df_2, filter_hyd_data.loc[:,tem_cols_3], how='left', left_on=['CAT_DID'], right_on=['CAT_DID'])
+
 
         # 토지피복정보 병합
-        tem_cols_3 = merged_df_2.columns.tolist()
-        tem_cols_3.remove('지점명')
+        tem_cols_4 = merged_df_3.columns.tolist()
+        tem_cols_4.remove('지점명')
 
-        merged_df_3 = pd.merge(merged_df_2.loc[:,tem_cols_3], self._landcover_gdf.loc[:,['cate_1','cate_2','cate_3','cate_4','cate_5','cate_6','cate_7','CAT_DID']], how='left', left_on=['CAT_DID'], right_on=['CAT_DID'])
+        merged_df_4 = pd.merge(merged_df_3.loc[:,tem_cols_4], self._landcover_gdf.loc[:,['cate_1','cate_2','cate_3','cate_4','cate_5','cate_6','cate_7','CAT_DID']], how='left', left_on=['CAT_DID'], right_on=['CAT_DID'])
+        
         # 고도 및 기울기(지리정보) 병합
         # 좌표정보 dem자료로 바꾼 후 고도 등 머지
         ## dem에서 elevation 따오기
         dem_90_raster = rasterio.open(os.path.join(self._data_path,"rawdata","한반도","한반도90m_GRS80.img",))
 
-        merged_df_3_gpd = gpd.GeoDataFrame(merged_df_3, geometry='geometry')
-        merged_df_3_gpd.crs = self._landcover_gdf.crs
-        merged_df_3_gpd = merged_df_3_gpd.to_crs(dem_90_raster.crs)
-        # zonal_stats(vectors=merged_df_3_gpd,raster=masked_0_region, affine=dem_90_raster.transform,stats=["mean"],)
-        elevation = zonal_stats(vectors=merged_df_3_gpd,raster=dem_90_raster.read(1), affine=dem_90_raster.transform,stats=["mean"],)
+        merged_df_4_gpd = gpd.GeoDataFrame(merged_df_4, geometry='geometry')
+        merged_df_4_gpd.crs = self._landcover_gdf.crs
+        merged_df_4_gpd = merged_df_4_gpd.to_crs(dem_90_raster.crs)
+        # zonal_stats(vectors=merged_df_4_gpd,raster=masked_0_region, affine=dem_90_raster.transform,stats=["mean"],)
+        elevation = zonal_stats(vectors=merged_df_4_gpd,raster=dem_90_raster.read(1), affine=dem_90_raster.transform,stats=["mean"],)
         elevation_list = [ele['mean'] for ele in elevation]
-        merged_df_3_gpd.loc[:,'elevation'] = elevation_list
+        merged_df_4_gpd.loc[:,'elevation'] = elevation_list
         ele = dem_90_raster.read(1)
         cellsize = 90.
         px, py = np.gradient(ele, cellsize)
         slope = np.sqrt(px ** 2 + py ** 2)
         slope_deg = np.degrees(np.arctan(slope))
 
-        slope = zonal_stats(vectors=merged_df_3_gpd,raster=slope_deg, affine=dem_90_raster.transform,stats=["mean"],)
+        slope = zonal_stats(vectors=merged_df_4_gpd,raster=slope_deg, affine=dem_90_raster.transform,stats=["mean"],)
         slo_list = [slo['mean'] for slo in slope]
-        merged_df_3_gpd.loc[:,'slope'] = slo_list
-        t_cols = merged_df_3_gpd.columns.tolist()
-        t_cols.remove('geometry')
-        merged_df_3_gpd.loc[:,t_cols].to_csv(os.path.join(self._data_path,"merged",f'{summary_level}.csv'), encoding='euc-kr')
-
-        self._final_set = merged_df_3_gpd
+        merged_df_4_gpd.loc[:,'slope'] = slo_list
+        self._final_set = merged_df_4_gpd
+        
 
 
 
