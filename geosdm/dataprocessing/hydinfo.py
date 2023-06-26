@@ -420,4 +420,5 @@ def resample_hyd_data(hyd_gdf):
     hyd_df_filter_2.index = range(len(hyd_df_filter_2))
 
     hyd_df_filter_3 = pd.merge(hyd_df_filter_2,hyd_df_filter_1.drop_duplicates('관측소명').loc[:, ['관측소명', 'geometry','CAT_DID']], how = 'left', on = '관측소명')
+    
     return hyd_df_filter_3

@@ -150,6 +150,9 @@ class DataContorller():
         slope = zonal_stats(vectors=merged_df_4_gpd,raster=slope_deg, affine=dem_90_raster.transform,stats=["mean"],)
         slo_list = [slo['mean'] for slo in slope]
         merged_df_4_gpd.loc[:,'slope'] = slo_list
+
+        # 머지지역중 동일 CAT-DID에 여러지점있는 경우가 있어서, 비슷할것이라 가정하고 중복제거
+        merged_df_4_gpd = merged_df_4_gpd.drop_duplicates('조사지점')
         self._final_set = merged_df_4_gpd
         
 

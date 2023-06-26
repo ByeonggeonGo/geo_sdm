@@ -388,6 +388,17 @@ def resample_ecological_data(sp_gdf):
     'MBSNCD'
     }
 
+    geo_col = ['종횡사주_횟수_평가 ',
+            '자연성_정도_평가 ',
+            '유속_다양성_평가',
+            '하천변_폭_평가 ',
+            '저수로_하안_평가 ',
+            '하안_재료_평가 ',
+            '저질_상태_평가 ',
+            '횡구조물_방해_평가 ',
+            '제외지_토지이용_평가 ',
+            '제내지_토지이용_평가',]
+
     after_add = [
                 'OBJECTID',
                 'CAT_ID',
@@ -406,7 +417,8 @@ def resample_ecological_data(sp_gdf):
                 'SB_ID',
                 'SB_NM', 
                 '조사지점',
-                'geometry']
+                'geometry'] + geo_col
+    
     all_col = set(sp_gdf.columns)
     remain_col = list(all_col - remove_col) + ['조사년도']
 
@@ -420,9 +432,18 @@ def resample_ecological_data(sp_gdf):
     sp_df_resampled = pd.concat(df_bysite_list)
     sp_df_resampled.loc[:,'년'] = sp_df_resampled.index.year.tolist()
     sp_df_resampled.index = range(len(sp_df_resampled))
+    # 2015~2020 3번이상 출현이면 출현
     filter_1_sp_df = sp_df_resampled.loc[(sp_df_resampled.년 >= 2015) & (sp_df_resampled.년 <= 2020), :]
-    filter_2_sp_df = filter_1_sp_df.groupby(['조사지점','년']).min().groupby('조사지점').sum()
+    filter_2_sp_df = filter_1_sp_df.drop(geo_col, axis=1).groupby(['조사지점','년']).min().groupby('조사지점').sum()
     filter_3_sp_df = filter_2_sp_df.applymap(lambda x: 0 if x < 2 else 1)
+
+    ### 조사지점 조사정보?는 평균으로
+    geo_info_resmaple_df = filter_1_sp_df.loc[:,['조사지점','년'] + geo_col].groupby('조사지점').mean()
+    geo_info_resmaple_df.loc[:,'조사지점'] = geo_info_resmaple_df.index
+    geo_info_resmaple_df.index = range(len(geo_info_resmaple_df))
+    geo_info_resmaple_df = geo_info_resmaple_df.loc[:, ['조사지점'] + geo_col]
+
+    filter_3_sp_df = pd.merge(filter_3_sp_df, geo_info_resmaple_df, how='left', on='조사지점')
 
     tmp_cols = filter_3_sp_df.columns.tolist()
     for i in ['OBJECTID',
@@ -437,8 +458,7 @@ def resample_ecological_data(sp_gdf):
         tmp_cols.remove(i)
 
     filter_4_sp_df = filter_3_sp_df.loc[:,tmp_cols]
-    filter_4_sp_df.loc[:,'조사지점'] = filter_4_sp_df.index.tolist()
     filter_4_sp_df.index = range(len(filter_4_sp_df))
     filter_5_sp_df = pd.merge(filter_4_sp_df, filter_1_sp_df.drop_duplicates('조사지점').loc[:,['CAT_DID', '조사지점', 'geometry']], how='left', on='조사지점')
-    
+
     return filter_5_sp_df
