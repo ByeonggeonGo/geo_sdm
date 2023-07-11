@@ -30,6 +30,9 @@ def merge_sedi_data(data_path: str):
     new_point_list = [Point(transform(P4326, P5181, x, y)) for x,y in np.concatenate([sq_point_shp_2.geometry.x.values.reshape(-1,1), sq_point_shp_2.geometry.y.values.reshape(-1,1)],axis = 1).tolist()]
     sq_point_shp_2.geometry = new_point_list
 
+    sq_point_shp_1.crs = {'init':'epsg:5181'} #
+    sq_point_shp_2.crs = {'init':'epsg:5181'} #
+
     sq_point_shp = pd.concat([sq_point_shp_1,sq_point_shp_2],axis=0)
     sq_point_shp.index = range(len(sq_point_shp))
 
@@ -59,6 +62,10 @@ def merge_sedi_data(data_path: str):
             # 포함되는 영역이 없는 지점명
             print(merge2_sq_df.loc[i,['지점명']].tolist())
     # 년월일 데이트타임 생성
+    merge2_sq_df["년"] = merge2_sq_df["년"].astype(int)
+    merge2_sq_df["월"] = merge2_sq_df["월"].astype(int)
+    merge2_sq_df["일"] = merge2_sq_df["일"].astype(int)
+
     date_list = [str(merge2_sq_df.년[raw_ind]) +"-"+ str(merge2_sq_df.월[raw_ind]) +"-"+ str(merge2_sq_df.일[raw_ind]) for raw_ind in range(len(merge2_sq_df))]
     merge2_sq_df.loc[:,'일시'] = pd.to_datetime(date_list)
 

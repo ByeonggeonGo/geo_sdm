@@ -4,6 +4,7 @@ import os
 import pickle
 import geopandas as gpd
 import numpy as np
+from shapely.geometry import Point
 
 def merge_weather_data(data_path: str):
     em_dataset_path_list = glob(os.path.join(data_path,"rawdata","기후","sensor_data","*.csv",))
@@ -33,7 +34,7 @@ def merge_weather_data(data_path: str):
     cat_did_shp = gpd.GeoDataFrame.from_file(os.path.join(data_path,"KRF_ver3_total","KRF_ver3_CATCHMENT.shp",),encoding = 'cp949')
 
     import pyproj
-    from shapely.geometry import Point
+    
     from  shapely.ops import transform
 
     geo_point = []

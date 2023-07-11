@@ -19,12 +19,14 @@ from shapely.geometry import Point
 from pyproj import Proj, transform
 from rasterstats import zonal_stats
 
+from copy import deepcopy
 
 class DataContorller():
 
     def __init__(self, data_path: str, use_cleaned_dataset: bool):
         self._data_path = data_path
-
+        # 데이터 불러오기
+    
         ### dataset information ###
         #     * 데이터셋 가용기간
         # - 수리수문자료 2010 ~ 2020
@@ -83,8 +85,6 @@ class DataContorller():
 
     
     def get_merged_set(self, summary_level: str):
-
-       
 
         sp_gdf = self._Order_gdf if summary_level == 'Order' else self._Family_gdf if summary_level == 'Family' else self._name_gdf
 
@@ -153,13 +153,157 @@ class DataContorller():
 
         # 머지지역중 동일 CAT-DID에 여러지점있는 경우가 있어서, 비슷할것이라 가정하고 중복제거
         merged_df_4_gpd = merged_df_4_gpd.drop_duplicates('조사지점')
-        self._final_set = merged_df_4_gpd
+        return merged_df_4_gpd
         
 
+    def get_merged_set_year(self, summary_level: str):
+        
+        sp_gdf, wq_gdf, hyd_gdf, atm_gdf = self.get_filterd_df(summary_level)
+        merged_df = deepcopy(sp_gdf)
+        for origin_df in [wq_gdf, hyd_gdf, atm_gdf]:
+            resam_df = get_resampled_df(origin_df)
+            merged_df = pd.merge(merged_df, resam_df, how='left', left_on=['CAT_DID','조사년도', '조사회차'], right_on=['CAT_DID','조사년도', '조사회차'])
+        return merged_df
+
+    def get_merged_set_quarter(self, summary_level: str):
+        
+        sp_gdf, wq_gdf, hyd_gdf, atm_gdf = self.get_filterd_df(summary_level)
+        merged_df = deepcopy(sp_gdf)
+        for origin_df in [wq_gdf, hyd_gdf, atm_gdf]:
+            resam_df = get_resampled_df_season(origin_df)
+            merged_df = pd.merge(merged_df, resam_df, how='left', left_on=['CAT_DID','조사년도', '조사회차'], right_on=['CAT_DID','조사년도', '조사회차'])
+        return merged_df
+
+    def get_filterd_df(self, summary_level: str):
+        # 데이터 불러오기
+        hyd_cols = ['CAT_DID','측정시각', '수면폭', '단면적', '평균유속', '평균수심', '유량']
+        wq_cols = [
+            "CAT_DID",
+            "WMYR",
+            "WMOD",
+            "ITEM_TEMP",
+            "ITEM_PH",
+            "ITEM_BOD",
+            "ITEM_COD",
+            "ITEM_SS",
+            "ITEM_TN",
+            "ITEM_TP",
+            "ITEM_CLOA",
+            "ITEM_EC",
+            "ITEM_NO3N",
+            "ITEM_NH3N",
+            "ITEM_TOC",
+        ]
+
+        atm_cols = [
+            "CAT_DID",
+            "일시",
+            "평균기온(°C)",
+            "최저기온(°C)",
+            "최고기온(°C)",
+            "일강수량(mm)"
+        ]
+        Family_gdf = pickle.load(open(os.path.join(self._data_path,"merged","merged_1","Family_gdf.p",), "rb"))
+        Order_gdf = pickle.load(open(os.path.join(self._data_path,"merged","merged_1","Order_gdf.p",), "rb"))
+        name_gdf = pickle.load(open(os.path.join(self._data_path,"merged","merged_1","학명_gdf.p",), "rb"))
 
 
+        sp_gdf = Order_gdf if summary_level == 'Order' else Family_gdf if summary_level == 'Family' else name_gdf
 
 
+        # 자료 5종류 + 생물측정망자료
+        wq_gdf = pickle.load(open(os.path.join(self._data_path,"merged","merged_1","wq_gdf_newshp_3.p",), "rb"))[wq_cols]
+        hyd_gdf = pickle.load(open(os.path.join(self._data_path,"merged","merged_1","hyd_gdf.p",), "rb"))[hyd_cols]
+        atm_gdf = pickle.load(open(os.path.join(self._data_path,"merged","merged_1","atm_gdf.p",), "rb")) [atm_cols]
+        
+        # 날짜 정리
+        wq_gdf['Date'] = pd.to_datetime(wq_gdf['WMYR'].astype(str) + wq_gdf['WMOD'].astype(str), format='%Y%m')
+        atm_gdf['일시'] = pd.to_datetime(atm_gdf['일시'].astype(str), format='%Y-%m-%d')
+        atm_gdf['Date'] = atm_gdf['일시']
+        hyd_gdf['Date'] = hyd_gdf['측정시각']
+
+        # 안쓰는 시간정보 컬럼 제거
+        wq_gdf = wq_gdf.drop(['WMYR', 'WMOD'], axis=1)
+        atm_gdf = atm_gdf.drop(['일시'], axis=1)
+        hyd_gdf = hyd_gdf.drop(['측정시각'], axis=1)
+
+        # 년도 쿼터정보 할당
+        hyd_gdf.loc[:,'quarter'] = hyd_gdf['Date'].dt.quarter
+        hyd_gdf.loc[:,'year'] = hyd_gdf['Date'].dt.year
+
+        wq_gdf.loc[:,'quarter'] = wq_gdf['Date'].dt.quarter
+        wq_gdf.loc[:,'year'] = wq_gdf['Date'].dt.year
+
+        atm_gdf.loc[:,'quarter'] = atm_gdf['Date'].dt.quarter
+        atm_gdf.loc[:,'year'] = atm_gdf['Date'].dt.year
+
+        # 수질데이터 정량한계미만 0으로 할당
+        wq_gdf.replace('정량한계미만', 0, inplace=True)
+        # 정량한계 미만 제외 후 dtype지정
+        wq_gdf.loc[:, (wq_gdf.columns != 'CAT_DID') & (wq_gdf.columns != 'Date')] = wq_gdf.loc[:, (wq_gdf.columns != 'CAT_DID') & (wq_gdf.columns != 'Date')].astype(float)
+        return sp_gdf, wq_gdf, hyd_gdf, atm_gdf
 
 
+#봄철 측정인경우
+def get_round_info_spring(row):
+    if row['quarter'] == 1:
+        return row['Date'].year
+    else:
+        return row['Date'].year + 1
+    
+#가을철 측정인경우
+def get_round_info_autumn(row):
+    if row['quarter'] == 4:
+        return row['Date'].year + 1
+    else:
+        return row['Date'].year
+    
+#동일한 계절만 묶는 경우
+def get_round_info(row):
+    if row['quarter'] == 1:
+        return 1
+    elif row['quarter'] == 3:
+        return 2
+    else:
+        return 0
 
+def get_resampled_df(df):
+    def get_resampled_df_by_round(df, measure_round):
+
+        if measure_round == 1:
+            df['조사년도'] = df.apply(get_round_info_spring, axis=1)
+        elif measure_round == 2:
+            df['조사년도'] = df.apply(get_round_info_autumn, axis=1)
+        
+        df = df.groupby(['CAT_DID','조사년도']).mean()
+        cat_did = df.index.get_level_values('CAT_DID')
+        meas_y = df.index.get_level_values('조사년도')
+
+
+        df.reset_index(drop=True, inplace=True)
+        df.insert(0, 'CAT_DID', cat_did)
+        df.insert(1, '조사년도', meas_y)
+        df.reset_index(drop=True, inplace=True)
+        df = df.drop(['quarter', 'year'], axis=1)
+
+        df.insert(df.columns.get_loc('조사년도') + 1, '조사회차', measure_round)
+
+        return df
+    df_list = []
+    for i in [1,2]:
+        df_tm = get_resampled_df_by_round(df, i)
+        df_list.append(df_tm)
+    final_df = pd.concat(df_list, axis = 0)
+    final_df.index = range(len(final_df))
+    return final_df
+
+def get_resampled_df_season(df):
+
+    df = df.groupby(['CAT_DID','year','quarter']).mean()
+    df = df.reset_index()
+
+    df['조사회차'] = df.apply(get_round_info, axis=1)
+    df['조사년도'] = df['year']
+
+    df = df.drop(['quarter', 'year'], axis=1)
+    return df

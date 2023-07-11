@@ -4,6 +4,9 @@ import os
 import numpy as np
 import geopandas as gpd
 import pickle
+import pyproj
+from shapely.geometry import Point
+
 
 def merge_hyd_monitoring_n_coords(data_path: str):
     col_dict = {'관측기기': '관측기기',
@@ -251,9 +254,7 @@ def merge_hyd_monitoring_n_coords(data_path: str):
     # base_shp = shp_list[7]
     cat_did_shp = gpd.GeoDataFrame.from_file(os.path.join(data_path,"KRF_ver3_total","KRF_ver3_CATCHMENT.shp",),encoding = 'cp949')
 
-    import pyproj
-    from shapely.geometry import Point
-    from  shapely.ops import transform
+    
 
     geo_point = []
     # P5181 = pyproj.CRS('EPSG:7019')
@@ -262,6 +263,8 @@ def merge_hyd_monitoring_n_coords(data_path: str):
 
     project = pyproj.Transformer.from_crs(P4326, P5181, always_xy=True).transform
     # project = pyproj.Transformer.from_crs(P5181, P4326).transform
+    
+    from  shapely.ops import transform
 
     for i in range(len(cat_did_shp)):
         tt = transform(project, cat_did_shp.loc[i,'geometry'])

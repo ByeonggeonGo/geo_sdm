@@ -22,8 +22,6 @@ def reshape_eco_monitoring_data(data_path: str):
     #황박사님 매치 테이블 로드
     match_table = pd.read_csv(os.path.join(data_path,"rawdata","생물","sp_list_f.csv",), encoding='euc-kr')
 
-
-
     for i in sp_dataset_path_list:
         xl = pd.ExcelFile(i)
         sheet_names = xl.sheet_names

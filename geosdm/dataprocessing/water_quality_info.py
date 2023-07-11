@@ -24,7 +24,6 @@ def get_wq_api_data(data_path: str):
 
     df_list = []
     for i in range(len(WaterMeasuring_site_code_arr)):
-        print(i)
         site_code_param = ",".join(WaterMeasuring_site_code_arr[i])
         params['ptNoList'] = site_code_param
         response = requests.get(url, params=params)
