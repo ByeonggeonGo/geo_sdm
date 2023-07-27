@@ -157,21 +157,72 @@ class DataContorller():
         
 
     def get_merged_set_year(self, summary_level: str):
-        
         sp_gdf, wq_gdf, hyd_gdf, atm_gdf = self.get_filterd_df(summary_level)
+
+        # 기상지점 할당
+        temp_df = sp_gdf.loc[:,['조사지점', 'geometry']].drop_duplicates('조사지점')
+        temp_df.index = range(len(temp_df))
+
+        for i in range(len(temp_df)):
+            # test.geometry[i].distance(atm_df_resampled.geometry)
+            result = [temp_df.geometry[i].distance(at_point) for at_point in atm_gdf.drop_duplicates("지점명").geometry]
+            min_ind = np.argmin(result)
+            temp_df.loc[i,'기상지점'] = atm_gdf.drop_duplicates("지점명").iloc[min_ind].지점명# 수질정보 병합
+
+        sp_gdf = pd.merge(sp_gdf, temp_df.loc[:,['조사지점', '기상지점']], how = 'left', on = '조사지점')
+
         merged_df = deepcopy(sp_gdf)
-        for origin_df in [wq_gdf, hyd_gdf, atm_gdf]:
+        for origin_df in [wq_gdf, hyd_gdf]:
             resam_df = get_resampled_df(origin_df)
             merged_df = pd.merge(merged_df, resam_df, how='left', left_on=['CAT_DID','조사년도', '조사회차'], right_on=['CAT_DID','조사년도', '조사회차'])
+        merged_df = pd.merge(merged_df, self._landcover_gdf.loc[:,['cate_1','cate_2','cate_3','cate_4','cate_5','cate_6','cate_7','CAT_DID']], how='left', left_on=['CAT_DID'], right_on=['CAT_DID'])
+        
+        resam_df = get_resampled_df_atm(atm_gdf)
+        atm_cols = [
+            "지점명",
+            '조사년도', '조사회차',
+            "평균기온(°C)",
+            "최저기온(°C)",
+            "최고기온(°C)",
+            "일강수량(mm)"
+        ]
+
+        merged_df = pd.merge(merged_df, resam_df.loc[:,atm_cols], how='left', left_on=['기상지점','조사년도', '조사회차'], right_on=['지점명','조사년도', '조사회차'])
         return merged_df
 
     def get_merged_set_quarter(self, summary_level: str):
         
         sp_gdf, wq_gdf, hyd_gdf, atm_gdf = self.get_filterd_df(summary_level)
+        # 기상지점 할당
+        temp_df = sp_gdf.loc[:,['조사지점', 'geometry']].drop_duplicates('조사지점')
+        temp_df.index = range(len(temp_df))
+
+        for i in range(len(temp_df)):
+            # test.geometry[i].distance(atm_df_resampled.geometry)
+            result = [temp_df.geometry[i].distance(at_point) for at_point in atm_gdf.drop_duplicates("지점명").geometry]
+            min_ind = np.argmin(result)
+            temp_df.loc[i,'기상지점'] = atm_gdf.drop_duplicates("지점명").iloc[min_ind].지점명# 수질정보 병합
+
+        sp_gdf = pd.merge(sp_gdf, temp_df.loc[:,['조사지점', '기상지점']], how = 'left', on = '조사지점')
+
         merged_df = deepcopy(sp_gdf)
-        for origin_df in [wq_gdf, hyd_gdf, atm_gdf]:
+        for origin_df in [wq_gdf, hyd_gdf]:
             resam_df = get_resampled_df_season(origin_df)
             merged_df = pd.merge(merged_df, resam_df, how='left', left_on=['CAT_DID','조사년도', '조사회차'], right_on=['CAT_DID','조사년도', '조사회차'])
+        merged_df = pd.merge(merged_df, self._landcover_gdf.loc[:,['cate_1','cate_2','cate_3','cate_4','cate_5','cate_6','cate_7','CAT_DID']], how='left', left_on=['CAT_DID'], right_on=['CAT_DID'])
+        
+
+        resam_df = get_resampled_df_season_atm(atm_gdf)
+        atm_cols = [
+            "지점명",
+            '조사년도', '조사회차',
+            "평균기온(°C)",
+            "최저기온(°C)",
+            "최고기온(°C)",
+            "일강수량(mm)"
+        ]
+
+        merged_df = pd.merge(merged_df, resam_df.loc[:,atm_cols], how='left', left_on=['기상지점','조사년도', '조사회차'], right_on=['지점명','조사년도', '조사회차'])
         return merged_df
 
     def get_filterd_df(self, summary_level: str):
@@ -196,6 +247,8 @@ class DataContorller():
         ]
 
         atm_cols = [
+            "지점명",
+            "geometry",
             "CAT_DID",
             "일시",
             "평균기온(°C)",
@@ -300,6 +353,47 @@ def get_resampled_df(df):
 def get_resampled_df_season(df):
 
     df = df.groupby(['CAT_DID','year','quarter']).mean()
+    df = df.reset_index()
+
+    df['조사회차'] = df.apply(get_round_info, axis=1)
+    df['조사년도'] = df['year']
+
+    df = df.drop(['quarter', 'year'], axis=1)
+    return df
+
+def get_resampled_df_atm(df):
+    def get_resampled_df_by_round(df, measure_round):
+
+        if measure_round == 1:
+            df['조사년도'] = df.apply(get_round_info_spring, axis=1)
+        elif measure_round == 2:
+            df['조사년도'] = df.apply(get_round_info_autumn, axis=1)
+        
+        df = df.groupby(['지점명','조사년도']).mean()
+        cat_did = df.index.get_level_values('지점명')
+        meas_y = df.index.get_level_values('조사년도')
+
+
+        df.reset_index(drop=True, inplace=True)
+        df.insert(0, '지점명', cat_did)
+        df.insert(1, '조사년도', meas_y)
+        df.reset_index(drop=True, inplace=True)
+        df = df.drop(['quarter', 'year'], axis=1)
+
+        df.insert(df.columns.get_loc('조사년도') + 1, '조사회차', measure_round)
+
+        return df
+    df_list = []
+    for i in [1,2]:
+        df_tm = get_resampled_df_by_round(df, i)
+        df_list.append(df_tm)
+    final_df = pd.concat(df_list, axis = 0)
+    final_df.index = range(len(final_df))
+    return final_df
+
+def get_resampled_df_season_atm(df):
+
+    df = df.groupby(['지점명','year','quarter']).mean()
     df = df.reset_index()
 
     df['조사회차'] = df.apply(get_round_info, axis=1)
