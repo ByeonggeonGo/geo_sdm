@@ -165,9 +165,9 @@ class DataContorller():
 
         for i in range(len(temp_df)):
             # test.geometry[i].distance(atm_df_resampled.geometry)
-            result = [temp_df.geometry[i].distance(at_point) for at_point in atm_gdf.drop_duplicates("지점명").geometry]
+            result = [temp_df.geometry[i].distance(at_point) for at_point in atm_gdf.loc[atm_gdf.year.values == 2010].drop_duplicates("지점명").geometry]
             min_ind = np.argmin(result)
-            temp_df.loc[i,'기상지점'] = atm_gdf.drop_duplicates("지점명").iloc[min_ind].지점명# 수질정보 병합
+            temp_df.loc[i,'기상지점'] = atm_gdf.loc[atm_gdf.year.values == 2010].drop_duplicates("지점명").iloc[min_ind].지점명# 수질정보 병합
 
         sp_gdf = pd.merge(sp_gdf, temp_df.loc[:,['조사지점', '기상지점']], how = 'left', on = '조사지점')
 
@@ -199,9 +199,9 @@ class DataContorller():
 
         for i in range(len(temp_df)):
             # test.geometry[i].distance(atm_df_resampled.geometry)
-            result = [temp_df.geometry[i].distance(at_point) for at_point in atm_gdf.drop_duplicates("지점명").geometry]
+            result = [temp_df.geometry[i].distance(at_point) for at_point in atm_gdf.loc[atm_gdf.year.values == 2010].drop_duplicates("지점명").geometry]
             min_ind = np.argmin(result)
-            temp_df.loc[i,'기상지점'] = atm_gdf.drop_duplicates("지점명").iloc[min_ind].지점명# 수질정보 병합
+            temp_df.loc[i,'기상지점'] = atm_gdf.loc[atm_gdf.year.values == 2010].drop_duplicates("지점명").iloc[min_ind].지점명# 수질정보 병합
 
         sp_gdf = pd.merge(sp_gdf, temp_df.loc[:,['조사지점', '기상지점']], how = 'left', on = '조사지점')
 
